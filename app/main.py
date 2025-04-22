@@ -5,7 +5,11 @@ from fastapi.staticfiles import StaticFiles
 from api.endpoints.user import user_router
 from api.endpoints.info import info_router
 from api.endpoints.types import types_router
+from api.endpoints.dashboards import dash_router
+from api.endpoints.token import token_router
 from fastapi.middleware.cors import CORSMiddleware
+
+from core.data_seeds import run_seeds
 
 UPLOAD_DIR = os.path.abspath("uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -14,10 +18,14 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 routes = [
     user_router,
     info_router,
-    types_router
+    types_router,
+    dash_router,
+    token_router
     ]
 
 app = FastAPI()
+
+run_seeds()
 
 app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
 

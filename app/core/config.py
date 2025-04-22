@@ -16,13 +16,6 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
-        print(self.__DATABASE_URI_FORMAT)
-        print(self.__DB_HOST)
-        print(self.__DB_USER)
-        print(self.__DB_PASSWORD)
-        print(self.__DB_PORT)
-        print(self.__DB_ENGINE)
-        print(self.__DB_NAME)
         return self.__DATABASE_URI_FORMAT.format(
             db_engine=self.__DB_ENGINE,
             user=self.__DB_USER,

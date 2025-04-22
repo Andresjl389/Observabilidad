@@ -14,6 +14,7 @@ from models.user import User
 from models.type_info import Type
 from models.token import Token
 from models.info import Info
+from models.role import Role
 
 
 

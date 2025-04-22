@@ -5,9 +5,11 @@ from sqlalchemy.orm import Session
 from services.user_service import create_user
 
 
-user_router = APIRouter()
+user_router = APIRouter(
+    tags=['User']
+)
 
-@user_router.post("/users", response_model=UserCreate, status_code=201, tags=['User'])
+@user_router.post("/users", response_model=UserCreate, status_code=201)
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     try:
         return await create_user(db, user)

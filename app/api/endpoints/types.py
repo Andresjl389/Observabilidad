@@ -9,9 +9,11 @@ from sqlalchemy.orm import Session
 
 
 
-types_router = APIRouter()
+types_router = APIRouter(
+    tags=['Types']
+)
 
-@types_router.get("/types", response_model=list[GetType], status_code=201, tags=['Types'])
+@types_router.get("/types", response_model=list[GetType], status_code=201)
 async def get_all_types(db: Session = Depends(get_db)):
     try:
         return JSONResponse(content=jsonable_encoder({'Types':get_types(db)}))

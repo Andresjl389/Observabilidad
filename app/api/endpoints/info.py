@@ -10,12 +10,14 @@ from core.db import get_db
 from sqlalchemy.orm import Session
 
 
-info_router = APIRouter()
+info_router = APIRouter(
+    tags=['Info']
+)
 
 info_router.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 
-@info_router.get("/info-by", response_model=List[GetInfo], status_code=200, tags=['Info'])
+@info_router.get("/info-by", response_model=List[GetInfo], status_code=200, )
 def get_info(
     type_id: UUID,
     request: Request,  # Agregar request para generar la URL de la imagen
@@ -32,7 +34,7 @@ def get_info(
         )
 
 
-@info_router.post("/info", status_code=201, tags=['Info'])
+@info_router.post("/info", status_code=201)
 def create_info(
     type_id: UUID = Form(...),
     user_id: UUID = Form(...),
@@ -51,14 +53,14 @@ def create_info(
     )
     return create(db, type_id, user_id, info, file)
 
-@info_router.get("/info/{info_id}", status_code=200, response_model=GetInfo, tags=["Info"])
+@info_router.get("/info/{info_id}", status_code=200, response_model=GetInfo)
 def get_info_by_id(
     info_id: UUID,
     db: Session = Depends(get_db),
 ):
     return get_id(db, info_id)
 
-@info_router.get("/info", status_code=200, response_model=List[GetInfo], tags=["Info"])
+@info_router.get("/info", status_code=200, response_model=List[GetInfo])
 def get_all(
     request: Request,
     db: Session = Depends(get_db),
