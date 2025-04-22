@@ -5,7 +5,7 @@ from schemas.token_schema import TokenBase
 from schemas.type_schema import GetType
 from repositories.token_repository import get, get_by_id, update
 
-def update_token(token: TokenBase,token_id:UUID, db: Session):
+def update_token(token: TokenBase,token_id:UUID, current_user: UUID, db: Session):
     try:
         existing_token = get_by_id(db, token_id)
         if not existing_token:
@@ -13,6 +13,8 @@ def update_token(token: TokenBase,token_id:UUID, db: Session):
         
         for field, value in token.model_dump(exclude_unset=True).items():
             setattr(existing_token, field, value)
+
+        existing_token.user_id = current_user
 
         return update(db, existing_token)
     except Exception as e:
