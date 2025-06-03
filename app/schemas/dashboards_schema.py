@@ -1,5 +1,7 @@
+from fastapi import Query
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import date
 
 class DataPoint(BaseModel):
     dimensions: List[str]
@@ -19,3 +21,7 @@ class DynatraceResponse(BaseModel):
     resolution: str
     warnings: Optional[List[str]]
     result: List[ResultItem]
+
+class Dates(BaseModel):
+    start_date: Optional[date] = Query(None)
+    end_date: Optional[date] = Query(None)

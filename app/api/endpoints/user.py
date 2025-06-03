@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+import requests
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from core.security import get_current_user
+from repositories.user_repository import get_user_by_email, insert_user
+from core.security import create_access_token, get_current_user
 from schemas.user_schema import GetUser, Token, UserCreate, UserLogin
 from core.db import get_db
 from sqlalchemy.orm import Session
-from services.user_service import create_user, get_user, login_user
+from services.user_service import create_user, get_user, google_authenticate, login_user
 
 
 user_router = APIRouter(
@@ -22,14 +24,26 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@user_router.post('/login', response_model=Token)
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    return login_user(db, user)
+@user_router.post('/login')
+def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
+    return login_user(db, user, response)
 
 
 @user_router.get('/user', response_model=GetUser)
 def get(
+    request: Request,
     current_user: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
     ):
-    return get_user(current_user, db)
+    return get_user(current_user, db, request)
+
+
+@user_router.post("/google-login", response_model=Token)
+async def google_login(request: Request, db: Session = Depends(get_db)):
+    data = await request.json()
+    id_token = data.get("idToken")
+
+    if not id_token:
+        raise HTTPException(status_code=400, detail="ID token requerido")
+
+    return google_authenticate(db, id_token)

@@ -31,10 +31,10 @@ app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ⚠️ Puedes restringir a ["http://localhost:3000"]
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # No uses ["*"] si usas credentials
+    allow_credentials=True,  # Habilita el envío de cookies/autenticación
+    allow_methods=["*"],     # O puedes especificar ["GET", "POST", ...]
+    allow_headers=["*"],     # O puedes especificar los headers necesarios
 )
 
 

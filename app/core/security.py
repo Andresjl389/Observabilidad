@@ -1,6 +1,6 @@
 import bcrypt
 from datetime import datetime, timedelta
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 
@@ -59,16 +59,20 @@ def decode_access_token(token: str):
         )
 
 # Obtener el usuario actual desde el token
+# core/security.py
+
 def get_current_user(token: str = Depends(auth_scheme)):
     print("Token recibido:", token)
     jwt_token = token.credentials
-    print("Token JWT:", jwt_token)
-    
-    payload = decode_access_token(jwt_token)
-    print("Payload decodificado:", payload)
+    if not jwt_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
 
-    username = payload.get('sub')
-    if not username:
-        raise HTTPException(status_code=401, detail='Token inválido: no contiene el campo "sub"')
-    
-    return username
+    try:
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+        return user_id
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+

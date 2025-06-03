@@ -34,8 +34,8 @@ def get_info(
 
 @info_router.post("/info", status_code=201)
 def create_info(
-    current_user: str = Depends(get_current_user),
     type_id: UUID = Form(...),
+    current_user: str = Depends(get_current_user),
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     icon: Optional[str] = Form(None),
@@ -63,6 +63,5 @@ def get_info_by_id(
 def get_all(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
 ):
     return get(request,db)

@@ -14,8 +14,8 @@ types_router = APIRouter(
     tags=['Types']
 )
 
-@types_router.get("/types", response_model=list[GetType], status_code=201)
-async def get_all_types(db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
+@types_router.get("/types", response_model=list[GetType], status_code=200)
+async def get_all_types(db: Session = Depends(get_db)):
     try:
         return get_types(db)
     except ValueError as e:
