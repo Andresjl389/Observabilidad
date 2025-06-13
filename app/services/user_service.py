@@ -38,7 +38,6 @@ def login_user(db: Session, user_login: UserLogin, response: Response)  -> GetUs
 
 
 def get_user(id: UUID, db: Session, request: Request) -> GetUser:
-    print('Algo algo',request.cookies.get("access_token"))
     user = get_user_by_id(db, id)
     if not user:
         raise HTTPException(status_code=401, detail='Usuario invalido')

@@ -1,10 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
-from core.security import get_current_user
 from schemas.type_schema import GetType
 from services.type_service import get_types
-from schemas.user_schema import UserCreate
 from core.db import get_db
 from sqlalchemy.orm import Session
 

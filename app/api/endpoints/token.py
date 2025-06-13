@@ -1,7 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends
 from core.security import get_current_user
 from services.token_service import get_all, update_token
 from schemas.token_schema import GetToken, TokenBase

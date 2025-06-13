@@ -1,9 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-import requests
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
-from repositories.user_repository import get_user_by_email, insert_user
-from core.security import create_access_token, get_current_user
+from core.security import get_current_user
 from schemas.user_schema import GetUser, Token, UserCreate, UserLogin
 from core.db import get_db
 from sqlalchemy.orm import Session

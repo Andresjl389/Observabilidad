@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 from schemas.info_schema import GetInfo, InfoBase
-from repositories.info_repository import get_all, get_by_id, get_by_user_type, create_info
+from repositories.info_repository import delete, get_all, get_by_id, get_by_user_type, create_info, update_info
 from schemas.user_schema import UserCreate
 
 UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
@@ -74,3 +74,55 @@ def get(request:Request, db: Session):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error fetching info: {str(e)}")
+    
+    
+
+def delete_service(db: Session, info_id: UUID):
+    try:
+        deleted_info = delete(db, info_id)
+        if not deleted_info:
+            raise HTTPException(status_code=404, detail="Info not found")
+        return {"message": "Deleted successfully", "id": str(info_id)}
+    except HTTPException as http_exc:
+        raise http_exc  # Re-raise si ya es una HTTPException como 404
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting info: {str(e)}")
+    
+    
+def update_service(
+    db: Session,
+    info_id: UUID,
+    user_id: UUID,
+    type_id: UUID,
+    info: InfoBase,
+    file: UploadFile = None
+):
+    try:
+        existing_info = get_by_id(db, info_id)
+        if not existing_info:
+            raise HTTPException(status_code=404, detail="Info not found")
+
+        filename = existing_info.filename
+        filepath = existing_info.filepath
+
+        if file:
+            validate_image(file)
+            file_path = os.path.join(UPLOAD_DIR, file.filename)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            filename = file.filename
+            filepath = f"/static/{file.filename}"
+
+        updated_info = update_info(
+            db=db,
+            info_id=info_id,
+            info=info,
+            type_id=type_id,
+            filename=filename,
+            filepath=filepath
+        )
+        return updated_info
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating info: {str(e)}")

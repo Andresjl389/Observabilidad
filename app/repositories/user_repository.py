@@ -10,7 +10,8 @@ async def insert_user(db: Session, user: UserCreate):
     db_user = User(
         name = user.name,
         email = user.email,
-        password = hashed_password
+        password = hashed_password,
+        role_id = 'b64bcee3-1bee-468e-9825-39a7a77112bc'
         )
     db.add(db_user)
     db.commit()

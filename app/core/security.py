@@ -18,9 +18,6 @@ auth_scheme = HTTPBearer()
 def get_password_hash(password):
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
-    print("Password:", password)
-    print("Salt:", salt)
-    print("Hashed password:", hashed_password)
     return hashed_password.decode('utf-8')
 
 # Verificar hash de contraseña
@@ -32,11 +29,6 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    
-    print("Tiempo actual:", datetime.utcnow())
-    print("Expira en:", expire)
-    print("Exp timestamp:", int(expire.timestamp()))
-
     to_encode.update({
         'exp': expire,
     })
@@ -48,10 +40,8 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 def decode_access_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        print('Decode payload:', payload)
         return payload
     except JWTError as e:
-        print("Excepción al decodificar token:", e)
         raise HTTPException(
             status_code=401,
             detail=f"Token inválido o expirado: {str(e)}",
@@ -62,7 +52,6 @@ def decode_access_token(token: str):
 # core/security.py
 
 def get_current_user(token: str = Depends(auth_scheme)):
-    print("Token recibido:", token)
     jwt_token = token.credentials
     if not jwt_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
