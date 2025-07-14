@@ -15,6 +15,7 @@ def seed_types(db: Session):
         Type(name='Información relevante'),
         Type(name='Tarjeta con imagen'),
         Type(name='Información herramientas observabilidad'),
+        Type(name='Videos'),
     ]
     db.add_all(info)
     print("Tipos de información añadidos.")

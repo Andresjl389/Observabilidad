@@ -1,16 +1,15 @@
 from datetime import timedelta
 from uuid import UUID
 from fastapi import HTTPException, Request, status
-import requests
 from sqlalchemy.orm import Session
 from core.security import check_password_hash, create_access_token
-from repositories.user_repository import get_user_by_id, insert_user, get_user_by_email
-from schemas.user_schema import GetUser, UserCreate, UserLogin
-from google.oauth2 import id_token as google_id_token 
-from google.auth.transport import requests as google_requests
+from repositories.user_repository import delete, get_user_by_id, insert_user, get_user_by_email, update_user_repo, users
+from schemas.user_schema import GetUser, UpdateUser, UserCreate, UserLogin
 import logging
 from fastapi import Response
 logger = logging.getLogger(__name__)
+
+ADMIN_ROLE_ID = UUID("864c38b2-4a35-40a1-84d4-39af5a18b3bc")
 
 
 def create_user(db: Session, user: UserCreate):
@@ -37,41 +36,60 @@ def login_user(db: Session, user_login: UserLogin, response: Response)  -> GetUs
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
-def get_user(id: UUID, db: Session, request: Request) -> GetUser:
-    print('Algo algo',request.cookies.get("access_token"))
+def get_user(id: UUID, db: Session) -> GetUser:
     user = get_user_by_id(db, id)
     if not user:
         raise HTTPException(status_code=401, detail='Usuario invalido')
     return user
 
+def get_all_users(db: Session):
+    return users(db)
 
-def google_authenticate(db: Session, id_token: str):
+def delete_user(current_user_id: UUID, user_id: UUID, db: Session):
     try:
-        # Get Google's public keys to validate the token
-        response = requests.get("https://www.googleapis.com/oauth2/v3/certs")
-        certs = response.json()
+        current_user = get_user_by_id(db, current_user_id)
+        if not current_user or current_user.role.id != ADMIN_ROLE_ID:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to delete users."
+            )
 
-        # Verify the id_token with Google's public keys
-        payload = google_id_token.verify_oauth2_token(
-            id_token,
-            Request(),
-            audience="your-client-id.apps.googleusercontent.com"  # Replace with your OAuth 2.0 client ID
-        )
+        deleted_info = delete(db, user_id)
+        if not deleted_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        return {
+            "message": "Deleted successfully",
+            "id": str(user_id)
+        }
+
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
-        print("Error validating with Google:", e)
-        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting user: {str(e)}"
+        )
+        
 
-    email = payload.get("email")
-    name = payload.get("name")
+def update_user(current_user_id: UUID, user_data: UpdateUser, db: Session):
+    current_user = get_user_by_id(db, current_user_id)
 
-    if not email:
-        raise HTTPException(status_code=400, detail="Email not found in the token")
+    if not current_user or current_user.role.id != ADMIN_ROLE_ID:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para actualizar usuarios."
+        )
 
-    user = get_user_by_email(db, email)
-    if not user:
-        dummy_password = "google_oauth_dummy_password"
-        new_user = UserCreate(name=name, email=email, password=dummy_password)
-        user = insert_user(db, new_user)
-
-    token = create_access_token(data={"sub": str(user.id)}, expires_delta=timedelta(minutes=30))
-    return {"access_token": token, "token_type": "bearer"}
+    updated_user = update_user_repo(db, user_data)
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado."
+        )
+    
+    return updated_user

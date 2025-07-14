@@ -21,7 +21,8 @@ def dates(start_date: Optional[date] = None, end_date: Optional[date] = None) ->
     if not end_date:
         timestamp_end = int(datetime.now().timestamp() * 1000)
     else:
-        timestamp_end = int(datetime.combine(end_date, datetime.min.time()).timestamp() * 1000)
+        # Ajusta al final del día
+        timestamp_end = int(datetime.combine(end_date, datetime.max.time()).timestamp() * 1000)
 
     print('Tiempos:', timestamp_start, timestamp_end)
     return timestamp_start, timestamp_end
@@ -99,14 +100,23 @@ def data(db: Session):
 
     return {"error": "Timeout", "message": "La consulta no se completó después de varios intentos"}
 
-def disponibilidad(db: Session):
-    token = get_by_id(db,'23fc730f-7acd-4727-b157-43152cfa02de')
-
+def disponibilidad(is_davicom: bool, db: Session, year: int, reintentos=2):
+    token = get_by_id(db, '23fc730f-7acd-4727-b157-43152cfa02de')
+    canal = 'SUPERAPP DAVIVIENDA'
+    
+    if is_davicom:
+        canal = 'DAVIVIENDA.COM'
+    
+    # Query optimizada con timeout y período reducido
     query = f"""
     {{
       actor {{
         account(id: 3040357){{
-          nrql(query: "SELECT average(numeric(procentaje_disponibilidad_num)) as 'Canales Digitales' from Log_Dispo2024 where nombre like 'SUPERAPP DAVIVIENDA' and hostname = 'SADGBACGS' LIMIT max since 12 month ago FACET Mes"){{
+          nrql(
+
+            query: "SELECT latest(numeric(procentaje_disponibilidad_num)) as 'Canales Digitales' from Log_Dispo2024 where Categoria = 'Aplicacion' and nombre in ('{canal}') and hostname = 'SADGBACGS' and Mes LIKE '%{year}%' FACET Mes LIMIT 30 since 12 month ago"
+            timeout: 60
+          ){{
             results
           }}
         }}
@@ -119,15 +129,40 @@ def disponibilidad(db: Session):
         'Content-Type': 'application/json'
     }
 
-    body = {
-        "query": query,
-        "variables": ""
-    }
+    body = {"query": query, "variables": {}}
 
-    response = requests.post(URLNEWRELIC, json=body, headers=headers)
-    return response.json()['data']['actor']['account']['nrql']['results']
+    # Reintentos con consulta más corta si hay timeout
+    for intento in range(reintentos + 1):
+        try:
+            response = requests.post(URLNEWRELIC, json=body, headers=headers, timeout=90)
+            result = response.json()
+            
+            # Si hay timeout, reducir período en siguiente intento
+            if 'errors' in result and any(e.get('extensions', {}).get('errorCode') == 'NRDB:1109' for e in result['errors']):
+                if intento < reintentos:
+                    # Reducir período para siguiente intento
+                    meses_anterior = 6 - (intento * 2)  # 6, 4, 2 meses
+                    meses_nuevo = 6 - ((intento + 1) * 2)
+                    body["query"] = body["query"].replace(f"SINCE {meses_anterior} months ago", f"SINCE {meses_nuevo} months ago")
+                    time.sleep(2)
+                    continue
+                else:
+                    return {"error": "Consulta con timeout después de varios intentos"}
+            
+            # Retornar resultados o error
+            return result.get('data', {}).get('actor', {}).get('account', {}).get('nrql', {}).get('results') or result
+            
+        except requests.exceptions.Timeout:
+            if intento < reintentos:
+                time.sleep(2)
+                continue
+            return {"error": "Timeout en petición HTTP"}
+        except Exception as e:
+            return {"error": f"Error: {str(e)}"}
+    
+    return {"error": "No se pudo completar la consulta"}
 
-def apdex_metrics(db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+def apdex_metrics(is_davicom: bool, db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
     token = get_by_id(db, '60e4daec-19f7-4cc7-a5fa-74c23cad2bf7')
     timestamp_start, timestamp_end = dates(start_date, end_date)
     
@@ -136,7 +171,7 @@ def apdex_metrics(db: Session, start_date: Optional[str] = None, end_date: Optio
         'Authorization': f'Api-Token {token.token}'
     }
     web_params = {
-        'metricSelector': '(builtin:apps.web.apdex.userType:filter(and(or(in("dt.entity.application",entitySelector("type(application),entityName.equals(~Superapp Web~)"))))):splitBy():sort(value(auto,descending)):limit(20)):limit(100):names',
+        'metricSelector': '(builtin:apps.web.apdex.userType:filter(and(or(in("dt.entity.application",entitySelector("type(application),entityName.equals(~"Superapp Web~")"))))):splitBy():sort(value(auto,descending)):limit(20)):limit(100):names',
         'from': timestamp_start,
         'to': timestamp_end,
         'resolution': 'Inf',
@@ -149,21 +184,35 @@ def apdex_metrics(db: Session, start_date: Optional[str] = None, end_date: Optio
         'resolution': 'Inf',
         'mzSelector': 'mzId(6734853283526883009)'
     }
+    davicom_params = {
+        'metricSelector': '(builtin:apps.web.apdex.userType:filter(and(or(in("dt.entity.application",entitySelector("type(application),entityName.equals(~"Portal_Personas~")"))),or(eq("User type","Real users")))):splitBy():avg:sort(value(avg,descending)):limit(20)):limit(100):names',
+        'from': timestamp_start,
+        'to': timestamp_end,
+        'resolution': 'Inf',
+    }
     result = {}
-    web_response = requests.get(url=URLV2, headers=headers, params=web_params)
-    if web_response.status_code == 200:
-        result['web'] = web_response.json()['result'][0]['data'][0]['values'][0]
+    if not is_davicom:
+        web_response = requests.get(url=URLV2, headers=headers, params=web_params)
+        if web_response.status_code == 200:
+            result['web'] = web_response.json()['result'][0]['data'][0]['values'][0]
+        else:
+            result['web'] = {"error": web_response.status_code, "message": web_response.text}
+        mobile_response = requests.get(url=URLV2, headers=headers, params=mobile_params)
+        if mobile_response.status_code == 200:
+            result['mobile'] = mobile_response.json()['result'][0]['data'][0]['values'][0]
+        else:
+            result['mobile'] = {"error": mobile_response.status_code, "message": mobile_response.text}
     else:
-        result['web'] = {"error": web_response.status_code, "message": web_response.text}
-    mobile_response = requests.get(url=URLV2, headers=headers, params=mobile_params)
-    if mobile_response.status_code == 200:
-        result['mobile'] = mobile_response.json()['result'][0]['data'][0]['values'][0]
-    else:
-        result['mobile'] = {"error": mobile_response.status_code, "message": mobile_response.text}
+        davicom_response = requests.get(url=URLV2, headers=headers, params=davicom_params)
+        if davicom_response.status_code == 200:
+            result['davicom'] = davicom_response.json()['result'][0]['data'][0]['values'][0]
+        else:
+            result['davicom'] = {"error": davicom_response.status_code, "message": davicom_response.text}
+
     
     return result
 
-def session_metrics(db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+def session_metrics(is_davicom: bool, db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
     token = get_by_id(db, '60e4daec-19f7-4cc7-a5fa-74c23cad2bf7')
     timestamp_start, timestamp_end = dates(start_date, end_date)
     
@@ -179,14 +228,15 @@ def session_metrics(db: Session, start_date: Optional[str] = None, end_date: Opt
         'query': "SELECT COUNT(DISTINCT(internalUserId)) FROM usersession WHERE ((useraction.application='SuperApp' OR userevent.application='SuperApp' OR usererror.application='SuperApp')) AND userId IS NOT NULL",
         'startTimestamp': timestamp_start,
         'endTimestamp': timestamp_end,
+        'resolution': 'Inf'
     }
     
-    unique_response = requests.get(url=URLV1, headers=headers_v1, params=unique_params)
-    if unique_response.status_code == 200:
-        unique_sessions = unique_response.json()['values'][0][0]
-        result['unique_sessions'] = unique_sessions*2
-    else:
-        result['unique_sessions'] = {"error": unique_response.status_code, "message": unique_response.text}
+    unique_davicom_params = {
+        'query': "SELECT COUNT(DISTINCT(userId)) FROM usersession WHERE ((useraction.application='Portal_Personas' OR userevent.application='Portal_Personas' OR usererror.application='Portal_Personas')) AND userId IS NOT NULL and userType = 'REAL_USER'",
+        'startTimestamp': timestamp_start,
+        'endTimestamp': timestamp_end,
+        'resolution': 'Inf'
+    }
     
     total_params = {
         'metricSelector': '(builtin:apps.mobile.sessionCount:filter(and(or(in("dt.entity.mobile_application",entitySelector("type(mobile_application),entityName.equals(~"SuperApp~")"))))):splitBy():sort(value(auto,descending)):limit(20)):limit(100):names',
@@ -196,7 +246,27 @@ def session_metrics(db: Session, start_date: Optional[str] = None, end_date: Opt
         'mzSelector': 'mzId(6734853283526883009)'
     }
     
-    total_response = requests.get(url=URLV2, headers=headers_v2, params=total_params)
+    tota_davicom_params = {
+        'metricSelector': '(builtin:apps.web.startedSessions:filter(and(or(in("dt.entity.application",entitySelector("type(application),entityName.equals(~"Portal_Personas~")"))))):splitBy():sum:sort(value(sum,descending)):limit(20)):limit(100):names',
+        'from': timestamp_start,
+        'to': timestamp_end,
+        'resolution': 'Inf',
+        'mzSelector': 'mzId(6142044417938371498)'
+    }
+    
+    if not is_davicom:
+        unique_response = requests.get(url=URLV1, headers=headers_v1, params=unique_params)
+        total_response = requests.get(url=URLV2, headers=headers_v2, params=total_params)
+    else:
+        total_response = requests.get(url=URLV2, headers=headers_v2, params=tota_davicom_params)
+        unique_response = requests.get(url=URLV1, headers=headers_v1, params=unique_davicom_params)
+    
+    if unique_response.status_code == 200:
+        unique_sessions = unique_response.json()['values'][0][0]
+        result['unique_sessions'] = unique_sessions*2
+    else:
+        result['unique_sessions'] = {"error": unique_response.status_code, "message": unique_response.text}
+    
     if total_response.status_code == 200:
         total_sessions = total_response.json()['result'][0]['data'][0]['values'][0]
         result['total_sessions'] = total_sessions*2
@@ -215,7 +285,7 @@ def session_metrics(db: Session, start_date: Optional[str] = None, end_date: Opt
     
     return result
 
-def login_time_by_platform(db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+def login_time_by_platform(is_davicom: bool, db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
     token = get_by_id(db, '60e4daec-19f7-4cc7-a5fa-74c23cad2bf7')
     timestamp_start, timestamp_end = dates(start_date, end_date)
     headers = {
@@ -237,33 +307,56 @@ def login_time_by_platform(db: Session, start_date: Optional[str] = None, end_da
         'resolution': 'Inf',
         'mzSelector': 'mzId(6734853283526883009)'
     }
+    davicom_params = {
+        "metricSelector": '(builtin:apps.web.action.duration.xhr.browser:filter(and(or(in("dt.entity.application_method",entitySelector("type(application_method),entityName.equals(~"acción dashboarddavivienda -> dashboardform:iniciobiocatch -> click~")")),in("dt.entity.application_method",entitySelector("type(application_method),entityName.equals(~"acción dashboarddavivienda -> # -> click~")"))))):splitBy("dt.entity.application_method"):avg:sort(value(avg,descending)):limit(20)):names',
+        'from': timestamp_start,
+        'to': timestamp_end,
+        'resolution': 'Inf',
+    }
+    
     
     result = {}
     ios_response = requests.get(url=URLV2, headers=headers, params=ios_params)
 
-    if ios_response.status_code == 200:
-        ios_data = ios_response.json()['result'][0]['data']
-        total_ios = sum(entry['values'][0] for entry in ios_data)
-        result['total_ios'] = round(total_ios/1000000, 2)
-    else:
-        result['ios'] = {"error": ios_response.status_code, "message": ios_response.text}
-        result['total_ios'] = None
+    if not is_davicom:
+        if ios_response.status_code == 200:
+            ios_data = ios_response.json()['result'][0]['data']
+            total_ios = sum(entry['values'][0] for entry in ios_data)
+            result['total_ios'] = round(total_ios/1000000, 2)
+        else:
+            result['ios'] = {"error": ios_response.status_code, "message": ios_response.text}
+            result['total_ios'] = None
 
-    android_response = requests.get(url=URLV2, headers=headers, params=android_params)
-    if android_response.status_code == 200:
-        android_data = android_response.json()['result'][0]['data']
-        total_android = sum(entry['values'][0] for entry in android_data)
-        result['total_android'] = round(total_android/1000000, 2)
+        android_response = requests.get(url=URLV2, headers=headers, params=android_params)
+        if android_response.status_code == 200:
+            android_data = android_response.json()['result'][0]['data']
+            total_android = sum(entry['values'][0] for entry in android_data)
+            result['total_android'] = round(total_android/1000000, 2)
+            
+        else:
+            result['android'] = {"error": android_response.status_code, "message": android_response.text}
+            result['total_android'] = None
     else:
-        result['android'] = {"error": android_response.status_code, "message": android_response.text}
-        result['total_android'] = None
+        davicom_response = requests.get(url=URLV2, headers=headers, params=davicom_params)
+        if davicom_response.status_code == 200:
+            davicom_data = davicom_response.json()['result'][0]['data']
+            total_davicom = sum(entry['values'][0] for entry in davicom_data)
+            result['total_davicom'] = round(total_davicom/1000, 2)
+            
+        else:
+            result['davicom'] = {"error": davicom_response.status_code, "message": davicom_response.text}
+            result['total_davicom'] = None
     
     return result
 
-def app_version(db: Session):
+def app_version(db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None):
     token = get_by_id(db, '60e4daec-19f7-4cc7-a5fa-74c23cad2bf7')
+    timestamp_start, timestamp_end = dates(start_date, end_date)
+    print(timestamp_start, timestamp_end)
     params = {
         'metricSelector': '(builtin:apps.other.uaCount.osAndVersion:splitBy("App Version"):value:sort(value(sum,descending)):limit(5)):limit(100):names',
+        'from': timestamp_start,
+        'to': timestamp_end,
         'resolution': 'Inf',
         'mzSelector': 'mzId(6734853283526883009)'
     }
@@ -280,7 +373,7 @@ def app_version(db: Session):
             version_name = entry['dimensions'][0]
             user_count = entry['values'][0]
             version_dict[version_name] = user_count
-        result   = version_dict
+        result = version_dict
         return result
     else:
         return {"error": response.status_code, "message": response.text}

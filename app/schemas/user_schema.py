@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
-from datetime import datetime
+from typing import Optional
+from pydantic import UUID4, BaseModel, EmailStr
+from schemas.role_schema import RoleBase
 
 class UserCreate(BaseModel):
     name: str
@@ -11,8 +12,16 @@ class UserLogin(BaseModel):
     password: str
 
 class GetUser(BaseModel):
+    id: UUID4
     name: str
     email: EmailStr
+    role: RoleBase
+
+class UpdateUser(BaseModel):
+    id: UUID4
+    name: str
+    email: EmailStr
+    role_id: UUID4
 
 class UserAuthenticated(BaseModel):  # Cambiado a PascalCase
     email: EmailStr
