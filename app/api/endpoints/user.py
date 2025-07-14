@@ -1,9 +1,10 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from core.security import get_current_user
-from schemas.user_schema import GetUser, Token, UserCreate, UserLogin
+from schemas.user_schema import GetUser, Token, UpdateUser, UserCreate, UserLogin
 from core.db import get_db
 from sqlalchemy.orm import Session
-from services.user_service import create_user, get_user, google_authenticate, login_user
+from services.user_service import create_user, delete_user, get_all_users, get_user, login_user, update_user
 
 
 user_router = APIRouter(
@@ -27,19 +28,31 @@ def login(user: UserLogin, response: Response, db: Session = Depends(get_db)):
 
 @user_router.get('/user', response_model=GetUser)
 def get(
-    request: Request,
     current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db),
     ):
-    return get_user(current_user, db, request)
+    return get_user(current_user, db)
 
 
-@user_router.post("/google-login", response_model=Token)
-async def google_login(request: Request, db: Session = Depends(get_db)):
-    data = await request.json()
-    id_token = data.get("idToken")
+@user_router.get('/all-users', response_model=list[GetUser])
+def get_users(
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    ):
+    return get_all_users(db)
 
-    if not id_token:
-        raise HTTPException(status_code=400, detail="ID token requerido")
+@user_router.delete('/user/{user_id}')
+def delete(
+    user_id: UUID,
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    ):
+    return delete_user(current_user, user_id, db)
 
-    return google_authenticate(db, id_token)
+@user_router.put('/user', response_model=GetUser)
+def update_user_endpoint(
+    user: UpdateUser,
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return update_user(current_user, user, db)

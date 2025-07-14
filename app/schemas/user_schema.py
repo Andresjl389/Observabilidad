@@ -12,9 +12,16 @@ class UserLogin(BaseModel):
     password: str
 
 class GetUser(BaseModel):
+    id: UUID4
     name: str
     email: EmailStr
     role: RoleBase
+
+class UpdateUser(BaseModel):
+    id: UUID4
+    name: str
+    email: EmailStr
+    role_id: UUID4
 
 class UserAuthenticated(BaseModel):  # Cambiado a PascalCase
     email: EmailStr

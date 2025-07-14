@@ -19,4 +19,4 @@ def depuration(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
     ):
-    return depuration_users(file)
+    return depuration_users(db, file)

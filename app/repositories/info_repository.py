@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import Request
 from sqlalchemy.orm import Session
+from models.type_info import Type
 from schemas.info_schema import GetInfo, InfoBase
 from models.info import Info
 from uuid import UUID
@@ -25,15 +26,20 @@ def get_by_id(db: Session, info_id: UUID):
     return db.query(Info).filter(Info.id == info_id).first()
 def get_all(request: Request, db: Session):
     info_list =  db.query(Info).all()
-
-
     for info in info_list:
         if info.filename:
             info.filepath = f"{request.base_url}static/{info.filename}"  # Ahora la URL debe funcionar
     
     return info_list
-    
 
+def get_videos(db: Session, request: Request):
+    info_list = db.query(Info).join(Type).filter(Type.name == "Videos").all()
+
+    for info in info_list:
+        if info.filename:
+            info.filepath = f"{request.base_url}static/{info.filename}"
+    
+    return info_list
 
 def create_info(
     db: Session,

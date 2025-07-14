@@ -114,7 +114,7 @@ def disponibilidad(is_davicom: bool, db: Session, year: int, reintentos=2):
         account(id: 3040357){{
           nrql(
 
-            query: "SELECT latest(numeric(procentaje_disponibilidad_num)) as 'Canales Digitales' from Log_Dispo2024 where Categoria = 'Aplicacion' and nombre in ('{canal}') and hostname = 'SADGBACGS' and Mes LIKE '%{year}%' FACET Mes LIMIT 30 since 5 minutes ago"
+            query: "SELECT latest(numeric(procentaje_disponibilidad_num)) as 'Canales Digitales' from Log_Dispo2024 where Categoria = 'Aplicacion' and nombre in ('{canal}') and hostname = 'SADGBACGS' and Mes LIKE '%{year}%' FACET Mes LIMIT 30 since 12 month ago"
             timeout: 60
           ){{
             results

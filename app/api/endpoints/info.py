@@ -3,8 +3,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Form, Query, File, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from core.security import get_current_user
-from schemas.info_schema import GetInfo, InfoBase
-from services.info_service import create, delete_service, get, get_by_filter, get_id, update_service
+from schemas.info_schema import GetInfo, GetVideo, InfoBase
+from services.info_service import create, delete_service, get, get_all_videos, get_by_filter, get_id, update_service
 from core.db import get_db
 from sqlalchemy.orm import Session
 
@@ -64,6 +64,14 @@ def get_all(
 ):
     return get(request,db)
 
+@info_router.get("/info-videos", status_code=200, response_model=List[GetVideo])
+def get_videos(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user) 
+):
+    return get_all_videos(request, db)
+
 @info_router.delete("/info/{info_id}", status_code=200)
 def delete_by_id(
     info_id: UUID,
@@ -75,12 +83,11 @@ def delete_by_id(
 @info_router.put('/info/{info_id}', status_code=200)
 def update_info(
     info_id: UUID,
-    type_id: UUID = Form(...),
+    type_id: UUID = Form(None),
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     icon: Optional[str] = Form(None),
     link: Optional[str] = Form(None),
-    file: UploadFile = File(None),
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
@@ -90,4 +97,6 @@ def update_info(
         icon=icon,
         link=link
     )
-    return update_service(db, info_id, current_user, type_id, info, file)
+    return update_service(db, info_id, current_user, type_id, info)
+
+

@@ -50,7 +50,6 @@ def get_token(db: Session):
     }
 
     response = requests.post(url, headers=headers, data=data)
-
     if response.status_code != 200:
         raise Exception(f"Error obteniendo token: {response.status_code} - {response.text}")
 
@@ -61,7 +60,7 @@ def get_token(db: Session):
     print('Token generado')
     return token
 
-def depuration_users(user_file: UploadFile = None):
+def depuration_users(db: Session, user_file: UploadFile = None):
     validate_file(user_file)
     file_path = os.path.join(UPLOAD_DIR, user_file.filename)
     with open(file_path, "wb") as buffer:
@@ -77,7 +76,7 @@ def depuration_users(user_file: UploadFile = None):
 
         try:
             account_id = '5d8555d6-ac2e-4fca-82dd-d32e718916c4'
-            token = get_token()
+            token = get_token(db)
             url = f'https://api.dynatrace.com/iam/v1/accounts/{account_id}/users/{user_email}'
             headers = {
                 'Authorization': f'Bearer {token}'

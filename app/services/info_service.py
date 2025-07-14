@@ -4,8 +4,9 @@ from uuid import UUID
 from fastapi import HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 from schemas.info_schema import GetInfo, InfoBase
-from repositories.info_repository import delete, get_all, get_by_id, get_by_user_type, create_info, update_info
+from repositories.info_repository import delete, get_all, get_by_id, get_by_user_type, create_info, get_videos, update_info
 from schemas.user_schema import UserCreate
+from repositories.type_repository import get as get_type
 
 UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True) 
@@ -74,7 +75,16 @@ def get(request:Request, db: Session):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error fetching info: {str(e)}")
-    
+
+def get_all_videos(request: Request, db: Session):
+    try:
+        videos = get_videos(db, request)
+        if not videos:
+            raise ValueError("No se encontraron videos")
+        return videos
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error fetching videos: {str(e)}")
     
 
 def delete_service(db: Session, info_id: UUID):
@@ -96,7 +106,6 @@ def update_service(
     user_id: UUID,
     type_id: UUID,
     info: InfoBase,
-    file: UploadFile = None
 ):
     try:
         existing_info = get_by_id(db, info_id)
@@ -105,14 +114,6 @@ def update_service(
 
         filename = existing_info.filename
         filepath = existing_info.filepath
-
-        if file:
-            validate_image(file)
-            file_path = os.path.join(UPLOAD_DIR, file.filename)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-            filename = file.filename
-            filepath = f"/static/{file.filename}"
 
         updated_info = update_info(
             db=db,
