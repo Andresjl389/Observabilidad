@@ -170,7 +170,7 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-/app/uploads/
-/app/depuration-dynatrace/
+/uploads/
+/depuration-dynatrace/
 .DS_Store
 /app/.DS_Store
