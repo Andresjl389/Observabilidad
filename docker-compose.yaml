@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: observabilidad-dav
+    ports:
+      - "8080:8080"
+    expose:
+      - 8080
+    environment:
+      DB_HOST: 34.60.190.130
+      DB_USER: postgres
+      DB_PASSWORD: andres
+      DB_PORT: 5432
+      DB_ENGINE: postgresql
+      DB_NAME: Observabilidad-Davivienda
+
+networks:
+  app-network:
