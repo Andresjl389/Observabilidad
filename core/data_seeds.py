@@ -1,9 +1,11 @@
+from core.security import get_password_hash
 from models.role import Role
 from models.type_info import Type
 from fastapi import Depends
 from core.db import SessionLocal
 from sqlalchemy.orm import Session
 from models.token import Token
+from models.user import User
 
 
 def seed_types(db: Session):
@@ -42,11 +44,22 @@ def seed_token(db: Session):
     ]
     db.add_all(roles)
     print("Tokens añadidos.")
+    
+def seed_admin(db: Session):
+    if db.query(Token).first():
+        print("Ya existen los roles. Seed omitido.")
+        return
+    roles = [
+        User(id='340e887e-67f2-4a89-b9b0-aed8b28c6c10', name='Admin', email='admin@admin.com',role_id='864c38b2-4a35-40a1-84d4-39af5a18b3bc',password=get_password_hash('admin123')),
+    ]
+    db.add_all(roles)
+    print("Usuario añadido.")
 
 def run_seeds():
     db: Session = SessionLocal()
     seed_types(db)
     seed_roles(db)
+    seed_admin(db)
     seed_token(db)
     db.commit()
     db.close()
