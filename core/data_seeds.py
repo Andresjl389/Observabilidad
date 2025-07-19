@@ -41,6 +41,7 @@ def seed_token(db: Session):
         Token(id='60e4daec-19f7-4cc7-a5fa-74c23cad2bf7',title='Dynatrace', user_id='340e887e-67f2-4a89-b9b0-aed8b28c6c10', token=''),
         Token(id='23fc730f-7acd-4727-b157-43152cfa02de',title='New Relic', user_id='340e887e-67f2-4a89-b9b0-aed8b28c6c10', token=''),
         Token(id='c052574a-9e1f-46cf-9d6e-6f87d2138c23',title='Client Secret', user_id='340e887e-67f2-4a89-b9b0-aed8b28c6c10', token=''),
+        Token(id='6d61cbd3-c8c4-4861-b75c-373b0a554cb1',title='Complemento dynatrace', user_id='340e887e-67f2-4a89-b9b0-aed8b28c6c10', token=''),
     ]
     db.add_all(roles)
     print("Tokens añadidos.")
